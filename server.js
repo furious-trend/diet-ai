@@ -1,14 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 function getSettings() {
   return {
@@ -252,6 +257,14 @@ async function callGroqApi(history, patientData, settings, systemOverride) {
     return data.choices[0].message.content;
 }
 
-app.listen(PORT, () => {
+// Serve static files from the React frontend build
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Catch-all route to serve index.html
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Backend AI API running on http://localhost:${PORT}`);
 });
