@@ -1,19 +1,13 @@
 import express from 'express';
+import serverless from 'serverless-http';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-const PORT = process.env.PORT || 3001;
 
 function getSettings() {
   return {
@@ -26,12 +20,18 @@ function getSettings() {
 // Ensure error responses have a consistent shape so frontend can fallback easily
 const mockRequiredResponse = { error: 'mockRequired', message: 'API key not configured or API request failed. Falling back to mock.' };
 
-app.get('/api/ai/status', (req, res) => {
+// Note: Netlify functions by default don't mount at the app root compared to regular express,
+// so depending on the rewrite rule, we might mount the routes without /api/ base.
+// But if rewrite sends /api/* to /.netlify/functions/api/api/*, we'd need to match that.
+// Let's use the router mounted at /api/ so it behaves identical locally and via redirect.
+const router = express.Router();
+
+router.get('/ai/status', (req, res) => {
   const { apiKey } = getSettings();
   res.json({ isConfigured: !!(apiKey && apiKey.trim().length > 0) });
 });
 
-app.post('/api/ai/chat', async (req, res) => {
+router.post('/ai/chat', async (req, res) => {
   const { history, patientData } = req.body;
   const settings = getSettings();
 
@@ -57,7 +57,7 @@ app.post('/api/ai/chat', async (req, res) => {
   }
 });
 
-app.post('/api/ai/analyze-report', async (req, res) => {
+router.post('/ai/analyze-report', async (req, res) => {
   const { text } = req.body;
   const settings = getSettings();
 
@@ -80,7 +80,6 @@ Respond ONLY with the raw JSON object, no markdown blocks.`;
 
   try {
     let responseText = await callSinglePrompt(prompt, settings, 'You are an expert clinical nutrition parser.');
-    // Extract JSON block using regex to ignore any <think> tags or preamble text
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       responseText = jsonMatch[0];
@@ -88,9 +87,7 @@ Respond ONLY with the raw JSON object, no markdown blocks.`;
       responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
     }
     
-    // Attempt parse
     const data = JSON.parse(responseText);
-    // ensure structure
     res.json({
       keyFindings: data.keyFindings || [],
       concerns: data.concerns || [],
@@ -104,7 +101,7 @@ Respond ONLY with the raw JSON object, no markdown blocks.`;
   }
 });
 
-app.post('/api/ai/generate-diet-chart', async (req, res) => {
+router.post('/ai/generate-diet-chart', async (req, res) => {
     const { patient, dayCount } = req.body;
     const settings = getSettings();
   
@@ -125,8 +122,7 @@ app.post('/api/ai/generate-diet-chart', async (req, res) => {
         {
           "day": "Day 1",
           "meals": [
-            { "time": "06:30 AM", "meal": "Wake-up Drink", "foodOptions": "...", "portion": "...", "notes": "..." },
-            ... up to 7 meals standard slots ...
+            { "time": "06:30 AM", "meal": "Wake-up Drink", "foodOptions": "...", "portion": "...", "notes": "..." }
           ]
         }
       ]
@@ -142,7 +138,6 @@ app.post('/api/ai/generate-diet-chart', async (req, res) => {
       }
       const data = JSON.parse(responseText);
       
-      // Merge with base metadata 
       res.json({
         patientId: patient.id,
         patientName: patient.name,
@@ -157,10 +152,13 @@ app.post('/api/ai/generate-diet-chart', async (req, res) => {
     }
 });
 
+app.use('/api', router);
+// Sometimes the Netlify rewrite path preserves the root of the function name
+app.use('/.netlify/functions/api/api', router); // Fallback
+
 // Helper API calls using global fetch
 async function callSinglePrompt(prompt, settings, systemInstruction) {
   const history = [{ sender: 'user', text: prompt }];
-  // Hacky reuse of existing chat formatting logic
   if (settings.provider === 'openai') {
     return await callOpenAIApi(history, null, settings, systemInstruction);
   } else if (settings.provider === 'gemini') {
@@ -170,7 +168,6 @@ async function callSinglePrompt(prompt, settings, systemInstruction) {
   }
   throw new Error('Unsupported provider');
 }
-
 
 async function callOpenAIApi(history, patientData, settings, systemOverride) {
     const sysPrompt = systemOverride || `You are Dr. Afreen Fathima's clinical nutrition assistant. Keep advice safe, culturally suitable, and specific to the patient profile. Do not prescribe medicines or diagnose. Always state that this plan is a draft requiring review by Dr. Afreen Fathima. Profile context: ${JSON.stringify(patientData || {})}`;
@@ -184,10 +181,7 @@ async function callOpenAIApi(history, patientData, settings, systemOverride) {
       body: JSON.stringify({
         model: settings.model || "gpt-4o-mini",
         messages: [
-          {
-            role: "system",
-            content: sysPrompt
-          },
+          { role: "system", content: sysPrompt },
           ...history.map(msg => ({
             role: msg.sender === "user" ? "user" : "assistant",
             content: msg.text
@@ -241,10 +235,7 @@ async function callGroqApi(history, patientData, settings, systemOverride) {
       body: JSON.stringify({
         model: settings.model || "llama-3.3-70b-versatile",
         messages: [
-          {
-            role: "system",
-            content: sysPrompt
-          },
+          { role: "system", content: sysPrompt },
           ...history.map(msg => ({
             role: msg.sender === "user" ? "user" : "assistant",
             content: msg.text
@@ -257,14 +248,4 @@ async function callGroqApi(history, patientData, settings, systemOverride) {
     return data.choices[0].message.content;
 }
 
-// Serve static files from the React frontend build
-app.use(express.static(path.join(__dirname, 'dist')));
-
-// Catch-all route to serve index.html
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Backend AI API running on http://localhost:${PORT}`);
-});
+export const handler = serverless(app);
