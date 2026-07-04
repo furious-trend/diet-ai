@@ -63,7 +63,7 @@ router.post('/ai/chat', async (req, res) => {
     res.json({ result });
   } catch (err) {
     console.error('AI Chat Error:', err.message);
-    res.status(503).json(mockRequiredResponse);
+    res.status(503).json({ error: 'realError', message: err.message });
   }
 });
 
