@@ -246,7 +246,7 @@ export default function PatientDashboard({ patients, onDeletePatient, onEditPati
                         Registered: {new Date(p.createdAt || Date.now()).toLocaleDateString()}
                       </span>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2 mt-2 md:mt-0 justify-end">
                         <button
                           type="button"
                           onClick={() => handleEdit(p)}

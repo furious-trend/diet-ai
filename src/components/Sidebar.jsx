@@ -7,11 +7,11 @@ import {
   Calendar, 
   Users, 
   Settings as SettingsIcon,
-  Activity,
-  HeartPulse
+  HeartPulse,
+  X 
 } from 'lucide-react';
 
-export default function Sidebar({ currentTab, setCurrentTab, clinicSettings }) {
+export default function Sidebar({ currentTab, setCurrentTab, clinicSettings, isMobileMenuOpen, setIsMobileMenuOpen }) {
   const menuItems = [
     { id: 'home', label: 'Welcome Page', icon: Home },
     { id: 'form', label: 'Patient Form', icon: UserPlus },
@@ -23,7 +23,16 @@ export default function Sidebar({ currentTab, setCurrentTab, clinicSettings }) {
   ];
 
   return (
-    <aside className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen sticky top-0 no-print">
+    <>
+      {/* Mobile Backdrop */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 z-40 md:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+      
+      <aside className={`fixed md:sticky top-0 left-0 z-50 w-64 h-screen bg-slate-900 border-r border-slate-800 flex flex-col justify-between shrink-0 no-print transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
       <div>
         {/* Brand/Doctor Title */}
         <div className="p-6 border-b border-slate-800 flex items-center gap-3">
@@ -48,7 +57,10 @@ export default function Sidebar({ currentTab, setCurrentTab, clinicSettings }) {
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentTab(item.id)}
+                onClick={() => {
+                  setCurrentTab(item.id);
+                  if (setIsMobileMenuOpen) setIsMobileMenuOpen(false);
+                }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-sm font-medium transition-all duration-200 ${
                   isActive 
                     ? 'bg-teal-600 text-white shadow-lg shadow-teal-600/25 border border-teal-500/30' 
@@ -80,5 +92,6 @@ export default function Sidebar({ currentTab, setCurrentTab, clinicSettings }) {
         </div>
       </div>
     </aside>
+    </>
   );
 }

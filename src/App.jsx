@@ -8,7 +8,7 @@ import DietChartGenerator from './components/DietChartGenerator';
 import PatientDashboard from './components/PatientDashboard';
 import Settings from './components/Settings';
 import DisclaimerBanner from './components/DisclaimerBanner';
-import { X, Sparkles, HeartPulse, User } from 'lucide-react';
+import { X, Sparkles, HeartPulse, User, Menu } from 'lucide-react';
 
 // Bootstrapped Clinical Cases for immediate playground testing
 const BOOTSTRAP_PATIENTS = [
@@ -156,6 +156,7 @@ const DEFAULT_SETTINGS = {
 
 export default function App() {
   const [currentTab, setCurrentTab] = useState('home');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [patients, setPatients] = useState(() => {
     const saved = localStorage.getItem('dr_afreen_patients');
     return saved ? JSON.parse(saved) : BOOTSTRAP_PATIENTS;
@@ -307,23 +308,35 @@ export default function App() {
           setCurrentTab(tab);
         }} 
         clinicSettings={clinicSettings} 
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
       />
 
       {/* Main Core Container */}
       <main className="flex-1 flex flex-col h-screen overflow-y-auto print-container">
         
         {/* Top Header App Header */}
-        <header className="bg-white border-b border-slate-100 px-8 py-4 shrink-0 flex items-center justify-between no-print">
-          <div className="flex items-center gap-4">
-            <h2 className="text-sm font-bold text-slate-850 uppercase tracking-widest">
-              {currentTab === 'home' && "Practice Overview"}
-              {currentTab === 'form' && (editingPatient ? "Modify Patient Chart" : "New Patient Intake")}
-              {currentTab === 'report' && "Lab Report Analysis"}
-              {currentTab === 'chat' && "AI Clinical Consult"}
-              {currentTab === 'diet' && "Diet Chart generation"}
-              {currentTab === 'patients' && "Registered Patient Index"}
-              {currentTab === 'settings' && "Clinic Settings"}
-            </h2>
+        <header className="bg-white border-b border-slate-100 flex-col md:flex-row px-4 md:px-8 py-4 shrink-0 flex md:items-center justify-between no-print gap-4">
+          <div className="flex items-center justify-between w-full md:w-auto md:gap-4 gap-2">
+            
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="md:hidden p-1.5 bg-slate-100 text-slate-700 rounded hover:bg-slate-200"
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+              <h2 className="text-xs md:text-sm font-bold text-slate-850 uppercase tracking-widest truncate max-w-[200px] md:max-w-none">
+                {currentTab === 'home' && "Practice Overview"}
+                {currentTab === 'form' && (editingPatient ? "Modify Patient Chart" : "New Patient Intake")}
+                {currentTab === 'report' && "Lab Report Analysis"}
+                {currentTab === 'chat' && "AI Clinical Consult"}
+                {currentTab === 'diet' && "Diet Chart generation"}
+                {currentTab === 'patients' && "Registered Patient Index"}
+                {currentTab === 'settings' && "Clinic Settings"}
+              </h2>
+            </div>
+            
             
             {/* Display active patient tag */}
             {currentPatientObj && currentTab !== 'home' && currentTab !== 'patients' && currentTab !== 'settings' && (
@@ -349,7 +362,7 @@ export default function App() {
         <DisclaimerBanner />
 
         {/* Tab Canvas Content */}
-        <div className="flex-1 p-8 print-container max-w-7xl w-full mx-auto">
+        <div className="flex-1 p-4 md:p-8 print-container max-w-7xl w-full mx-auto">
           {currentTab === 'home' && (
             <HeroSection 
               setCurrentTab={setCurrentTab} 
