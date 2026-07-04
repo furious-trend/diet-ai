@@ -1,5 +1,4 @@
 import express from 'express';
-import serverless from 'serverless-http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
@@ -24,6 +23,7 @@ const mockRequiredResponse = { error: 'mockRequired', message: 'API key not conf
 // so depending on the rewrite rule, we might mount the routes without /api/ base.
 // But if rewrite sends /api/* to /.netlify/functions/api/api/*, we'd need to match that.
 // Let's use the router mounted at /api/ so it behaves identical locally and via redirect.
+// For Vercel, it routes traffic natively to this module if placed in api/ folder.
 const router = express.Router();
 
 router.get('/ai/status', (req, res) => {
@@ -153,8 +153,6 @@ router.post('/ai/generate-diet-chart', async (req, res) => {
 });
 
 app.use('/api', router);
-// Netlify rewrite path preserves the root of the function name
-app.use('/.netlify/functions/api', router); 
 
 // Helper API calls using global fetch
 async function callSinglePrompt(prompt, settings, systemInstruction) {
@@ -248,4 +246,4 @@ async function callGroqApi(history, patientData, settings, systemOverride) {
     return data.choices[0].message.content;
 }
 
-export const handler = serverless(app);
+export default app;

@@ -3,6 +3,11 @@
   publish = "dist"
   functions = "netlify/functions"
 
+[dev]
+  command = "npm run dev:vite"
+  targetPort = 5173
+  framework = "#static"
+
 # Rewrite API requests to the Netlify function
 [[redirects]]
   from = "/api/*"

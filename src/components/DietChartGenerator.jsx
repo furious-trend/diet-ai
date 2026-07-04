@@ -12,7 +12,14 @@ import {
   TrendingDown,
   TrendingUp,
   Sparkles,
-  Droplet
+  Droplet,
+  Coffee,
+  Sun,
+  MoonStar,
+  Apple,
+  Utensils,
+  Clock,
+  Loader2
 } from 'lucide-react';
 import { generateSmartTimelinePlan } from '../services/aiService';
 
@@ -21,6 +28,7 @@ export default function DietChartGenerator({ patients, activePatientId, onSavePa
   const [dayCount, setDayCount] = useState(1);
   const [activePlan, setActivePlan] = useState(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Sync selected patient when activePatientId prop changes
   useEffect(() => {
@@ -43,13 +51,14 @@ export default function DietChartGenerator({ patients, activePatientId, onSavePa
 
   const activePatientObj = patients.find(p => p.id === selectedPatientId);
 
-  // Handler to compile diet plan
   const triggerGeneration = async () => {
     if (!activePatientObj) {
       onNotification("Please select a patient before compiling a diet plan.", "warning");
       return;
     }
+    if (isGenerating) return;
 
+    setIsGenerating(true);
     try {
       onNotification("Generating diet plan with AI...", "success");
       const compiled = await generateSmartTimelinePlan(activePatientObj, dayCount);
@@ -59,6 +68,8 @@ export default function DietChartGenerator({ patients, activePatientId, onSavePa
     } catch (err) {
       console.error(err);
       onNotification("Failed to generate plan. Please try again.", "warning");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -165,16 +176,38 @@ export default function DietChartGenerator({ patients, activePatientId, onSavePa
           {/* Action Trigger */}
           <button
             onClick={triggerGeneration}
+            disabled={isGenerating}
             type="button"
-            className="bg-teal-600 hover:bg-teal-700 text-white font-semibold text-xs py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-teal-605/20 transition-all cursor-pointer"
+            className={`font-semibold text-xs py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
+              isGenerating
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none'
+                : 'bg-teal-600 hover:bg-teal-700 text-white hover:shadow-lg hover:shadow-teal-605/20'
+            }`}
           >
-            <Sparkles className="w-4 h-4" />
-            <span>Generate Chart</span>
+            {isGenerating ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-4 h-4" />
+                <span>Generate Chart</span>
+              </>
+            )}
           </button>
         </div>
       </div>
 
-      {activePlan ? (
+      {isGenerating ? (
+        <div className="bg-white p-12 rounded-2xl border border-slate-100 shadow-sm flex flex-col items-center justify-center text-center py-32 animate-pulse">
+           <Loader2 className="w-12 h-12 text-teal-400 animate-spin mb-6" />
+           <h3 className="font-bold text-lg text-slate-800 tracking-wide">AI is Drafting Clinical Meals...</h3>
+           <p className="text-slate-400 text-sm mt-2 max-w-sm leading-relaxed">
+             This takes 10-15 seconds. Compiling local ingredients, checking allergies, and applying the clinical targets for {activePatientObj?.name || 'the patient'}.
+           </p>
+        </div>
+      ) : activePlan ? (
         <div className="space-y-6">
           {/* Main workspace editor */}
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden no-print">
@@ -216,76 +249,107 @@ export default function DietChartGenerator({ patients, activePatientId, onSavePa
               )}
             </div>
 
-            {/* Editable Spreadsheet Grid */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50/50 text-[10px] uppercase font-bold tracking-wider text-slate-400 border-b border-slate-100">
-                    <th className="px-6 py-4 w-[12%]">Time Slot</th>
-                    <th className="px-6 py-4 w-[16%]">Meal Group</th>
-                    <th className="px-6 py-4 w-[38%]">Food Options</th>
-                    <th className="px-6 py-4 w-[14%]">Portion</th>
-                    <th className="px-6 py-4 w-[16%]">Doctor instruction</th>
-                    <th className="px-6 py-4 w-[4%] text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {activePlan.days[selectedDayIndex]?.meals.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-slate-50/40 group transition-colors">
-                      <td className="px-6 py-3">
+            {/* Meal Cards Layout */}
+            <div className="p-6 space-y-4 bg-slate-50/50">
+              {activePlan.days[selectedDayIndex]?.meals.map((row, idx) => {
+                let MealIcon = Utensils;
+                let theme = "text-slate-600 bg-slate-100 border-slate-200";
+                const name = row.meal?.toLowerCase() || '';
+                
+                if (name.includes('wake') || name.includes('morning')) {
+                  MealIcon = Coffee;
+                  theme = "text-amber-600 bg-amber-50 border-amber-200";
+                } else if (name.includes('breakfast')) {
+                  MealIcon = Sun;
+                  theme = "text-orange-500 bg-orange-50 border-orange-200";
+                } else if (name.includes('snack')) {
+                  MealIcon = Apple;
+                  theme = "text-emerald-600 bg-emerald-50 border-emerald-200";
+                } else if (name.includes('lunch') || name.includes('meal')) {
+                  MealIcon = Utensils;
+                  theme = "text-teal-600 bg-teal-50 border-teal-200";
+                } else if (name.includes('dinner') || name.includes('bed')) {
+                  MealIcon = MoonStar;
+                  theme = "text-indigo-600 bg-indigo-50 border-indigo-200";
+                }
+
+                return (
+                  <div key={idx} className="group relative bg-white rounded-2xl border border-slate-150 p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col md:flex-row gap-5 items-start">
+                    
+                    {/* Time & Meal Identity */}
+                    <div className="flex flex-col gap-2 min-w-[140px] shrink-0">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${theme}`}>
+                        <MealIcon className="w-5 h-5" />
+                      </div>
+                      <div className="mt-1">
                         <input
                           type="text"
                           value={row.time}
                           onChange={(e) => handleCellEdit(selectedDayIndex, idx, 'time', e.target.value)}
-                          className="w-full bg-transparent border border-transparent group-hover:border-slate-200/80 hover:bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:bg-white font-medium text-slate-700"
+                          className="w-full text-base font-black text-slate-800 bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-teal-500 focus:outline-none transition-colors px-1 py-0.5 -ml-1 mt-1"
+                          placeholder="08:00 AM"
                         />
-                      </td>
-                      <td className="px-6 py-3">
                         <input
                           type="text"
                           value={row.meal}
                           onChange={(e) => handleCellEdit(selectedDayIndex, idx, 'meal', e.target.value)}
-                          className="w-full bg-transparent border border-transparent group-hover:border-slate-200/80 hover:bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:bg-white font-semibold text-slate-800"
+                          className="w-full text-xs font-bold text-slate-400 uppercase tracking-widest bg-transparent border-b-2 border-transparent hover:border-slate-200 focus:border-teal-500 focus:outline-none transition-colors px-1 py-0.5 -ml-1 mt-1"
+                          placeholder="MEAL NAME"
                         />
-                      </td>
-                      <td className="px-6 py-3">
-                        <textarea
-                          rows={2}
-                          value={row.foodOptions}
-                          onChange={(e) => handleCellEdit(selectedDayIndex, idx, 'foodOptions', e.target.value)}
-                          className="w-full bg-transparent border border-transparent group-hover:border-slate-200/80 hover:bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:bg-white text-slate-650 leading-relaxed font-sans resize-none"
-                        />
-                      </td>
-                      <td className="px-6 py-3">
+                      </div>
+                    </div>
+
+                    {/* Content Fields */}
+                    <div className="flex-1 w-full grid grid-cols-1 lg:grid-cols-12 gap-5">
+                      
+                      {/* Food Options & Clinical Notes */}
+                      <div className="lg:col-span-8 flex flex-col gap-3">
+                        <div>
+                          <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block mb-1.5 ml-1">Menu Items</label>
+                          <textarea
+                            rows={3}
+                            value={row.foodOptions}
+                            onChange={(e) => handleCellEdit(selectedDayIndex, idx, 'foodOptions', e.target.value)}
+                            className="w-full text-sm text-slate-700 font-medium leading-relaxed bg-slate-50/70 hover:bg-slate-50 border border-slate-100 focus:bg-white hover:border-slate-200 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-teal-500 transition-colors resize-none"
+                            placeholder="Food recommendations..."
+                          />
+                        </div>
+                        <div>
+                          <input
+                            type="text"
+                            value={row.notes}
+                            onChange={(e) => handleCellEdit(selectedDayIndex, idx, 'notes', e.target.value)}
+                            className="w-full text-xs italic font-medium text-slate-500 bg-transparent hover:bg-slate-50 border border-transparent hover:border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 transition-colors"
+                            placeholder="Clinical instructions (e.g., 'Low sodium', 'Avoid oil')..."
+                          />
+                        </div>
+                      </div>
+
+                      {/* Portion Field */}
+                      <div className="lg:col-span-4">
+                        <label className="text-[10px] uppercase font-bold tracking-widest text-slate-400 block mb-1.5 ml-1">Prescribed Portion</label>
                         <input
                           type="text"
                           value={row.portion}
                           onChange={(e) => handleCellEdit(selectedDayIndex, idx, 'portion', e.target.value)}
-                          className="w-full bg-transparent border border-transparent group-hover:border-slate-200/80 hover:bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:bg-white text-slate-600"
+                          className="w-full text-sm font-bold text-slate-700 bg-slate-50 hover:bg-white border border-slate-150 hover:border-slate-250 rounded-xl px-4 py-3 focus:outline-none focus:ring-1 focus:ring-teal-500 transition-colors"
+                          placeholder="e.g., '1 bowl'"
                         />
-                      </td>
-                      <td className="px-6 py-3">
-                        <input
-                          type="text"
-                          value={row.notes}
-                          onChange={(e) => handleCellEdit(selectedDayIndex, idx, 'notes', e.target.value)}
-                          className="w-full bg-transparent border border-transparent group-hover:border-slate-200/80 hover:bg-white rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-500 focus:bg-white text-slate-500 italic"
-                        />
-                      </td>
-                      <td className="px-6 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeMealRow(idx)}
-                          className="p-1 rounded-lg text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Delete meal row"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </div>
+                    </div>
+
+                    {/* Delete Card Button (Visible on Hover) */}
+                    <button
+                      type="button"
+                      onClick={() => removeMealRow(idx)}
+                      className="absolute top-5 right-5 p-2 rounded-xl text-slate-300 hover:text-rose-500 hover:bg-rose-50 transition-all opacity-0 group-hover:opacity-100"
+                      title="Delete meal card"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Row controller toolbar */}
