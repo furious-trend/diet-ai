@@ -1,5 +1,7 @@
 import { regionalFoods } from '../data/regionalFoods';
 
+const API_BASE = import.meta.env?.DEV ? 'https://diet-ai-opal.vercel.app' : '';
+
 /**
  * Advanced Keyword-based Clinic Analyzer
  * Extracts clinical flags and health markers from raw text reports.
@@ -407,7 +409,7 @@ export async function queryHealthChatbot(history, patientData, settings = {}) {
   const latestMessage = history[history.length - 1].text || "";
 
   try {
-    const res = await fetch('/api/ai/chat', {
+    const res = await fetch(`${API_BASE}/api/ai/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ history, patientData })
@@ -490,7 +492,7 @@ Please review this with Dr. Afreen Fathima to authorize the clinical instruction
 
 export async function nlpAnalyzeReport(text) {
   try {
-    const res = await fetch('/api/ai/analyze-report', {
+    const res = await fetch(`${API_BASE}/api/ai/analyze-report`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text })
@@ -509,7 +511,7 @@ export async function nlpAnalyzeReport(text) {
 
 export async function generateSmartTimelinePlan(patient, dayCount = 1) {
   try {
-    const res = await fetch('/api/ai/generate-diet-chart', {
+    const res = await fetch(`${API_BASE}/api/ai/generate-diet-chart`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ patient, dayCount })
