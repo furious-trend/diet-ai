@@ -403,103 +403,104 @@ export function localGenerateSmartTimelinePlan(patient, dayCount = 1) {
  * Chatbot Consultation Intelligence Layer
  * Intercepts user chats and returns responsive assistance matching Dr. Afreen's persona.
  */
-// --- Frontend Direct Groq AI Engine ---
-// We hit the Groq LLM directly from the frontend to avoid Vercel Serverless firewall/timeout issues.
-
-async function callDirectGroq(prompt, systemInstruction) {
-  const apiKey = import.meta.env.VITE_AI_API_KEY;
-  if (!apiKey) {
-    throw new Error('API key not configured in VITE_AI_API_KEY');
-  }
-
-  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: systemInstruction },
-        { role: "user", content: prompt }
-      ]
-    })
-  });
-
-  const data = await response.json();
-  if (data.error) throw new Error(data.error.message);
-  return data.choices[0].message.content;
-}
-
-export async function queryHealthChatbot(history, patientData) {
+export async function queryHealthChatbot(history, patientData, settings = {}) {
   const latestMessage = history[history.length - 1].text || "";
-  
-  try {
-    const apiKey = import.meta.env.VITE_AI_API_KEY;
-    if (!apiKey) throw new Error("No API key");
 
-    const sysPrompt = `You are Dr. Afreen Fathima's clinical nutrition assistant. Final plan must be reviewed by the doctor. Context: ${JSON.stringify(patientData || {})}`;
-    
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
-        messages: [
-          { role: "system", content: sysPrompt },
-          ...history.map(msg => ({
-            role: msg.sender === "user" ? "user" : "assistant",
-            content: msg.text
-          }))
-        ]
-      })
+  try {
+    const res = await fetch('/api/ai/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history, patientData })
     });
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
-    return data.choices[0].message.content;
+    const data = await res.json();
+    if (!data.error && data.result) {
+      return data.result;
+    }
   } catch (err) {
     console.error("AI API Call failed, falling back to offline clinical parser:", err);
-    // Offline simulation fallback logic below...
-    const query = latestMessage.toLowerCase();
-    if (query.includes("replace") || query.includes("instead of")) return "For a lower blood sugar index, substitute standard options with high fiber millets, quinoa, or tofu based on allergies.";
-    if (query.includes("diabetes") || query.includes("sugar")) return "For diabetes, strict control of refined carbs (like white rice) is advised. Focus on complex jowar, methi seeds, and high protein.";
-    return `I have recorded your query regarding "**${latestMessage}**". I will consult Dr. Afreen's guidelines and update the plan closely.`;
   }
+
+  // --- Offline Expert Simulation Engine ---
+  const query = latestMessage.toLowerCase();
+  let patientPromptInfo = "";
+  if (patientData && patientData.name) {
+    patientPromptInfo = ` (Answering for patient ${patientData.name}, age ${patientData.age}, BMI ${patientData.bmi}, Goal is ${patientData.goal.replace("_", " ")}, Location: ${patientData.region})`;
+  }
+
+  // 1. Requesting replacement / swapping
+  if (query.includes("replace") || query.includes("instead of") || query.includes("alternative") || query.includes("substitute")) {
+    if (query.includes("rice")) {
+      return `For a lower blood sugar index and high fiber content, you can substitute white rice with **Brown Rice**, **Foxtail Millet (Korra Annam)**, **Quinoa**, or **Jowar Rotis**. For South Indian meals, replacing standard rice with cooked browm Matta rice or a cauliflower rice mix works exceptionally well.`;
+    }
+    if (query.includes("milk") || query.includes("curd") || query.includes("paneer")) {
+      return `If the patient has a dairy allergy or is following a vegan diet, you can replace cow's milk with organic **Almond Milk** or **Soy Milk** (unsweetened). Substitute paneer with extra-firm **Tofu** (soy paneer), and standard curd with dairy-free coconut milk curd or peanut yogurt.`;
+    }
+    if (query.includes("roti") || query.includes("chapati")) {
+      return `You can alternate standard wheat chapatis with **Jowar (Sorghum) Roti**, **Bajra Roti** (especially in winters), or **Besan Crepes (Chillas)**. These are gluten-free, high-protein options that prevent sudden blood glucose spikes.`;
+    }
+    return `To suggest a precise ingredient substitution, please tell me which food item from the plan you want to swap (e.g. eggs, oatmeal, almonds) and I will provide culturally suitable alternatives for Dr. Afreen's review!`;
+  }
+
+  // 2. BMI or Weight related questions
+  if (query.includes("bmi") || query.includes("weight") || query.includes("calorie") || query.includes("fat")) {
+    let bmiAdvice = "A healthy body weight is maintained by combining caloric deficits (for weight loss) or structural surpluses (for muscle building) with high-density proteins and complex carbohydrates.";
+    if (patientData && patientData.bmi) {
+      bmiAdvice = `Active patient ${patientData.name} has a BMI of ${patientData.bmi} (${patientData.bmiCategory}). `;
+      if (patientData.bmiCategory === "Obese" || patientData.bmiCategory === "Overweight") {
+        bmiAdvice += `Since the category is ${patientData.bmiCategory}, we focus on fat burning, fiber elevation (green leafy greens, oats, millets), portion controls, and deleting empty refined wheat or high lipid items.`;
+      } else if (patientData.bmiCategory === "Underweight") {
+        bmiAdvice += `To transition from Underweight, we support muscle growth through caloric-dense proteins: paneer, chicken, egg whites, soaked almonds, and banana smoothies.`;
+      }
+    }
+    return `${bmiAdvice} Also, avoid eating fast food, high sodium items, and sugary pastries. Drink 3L of water daily to regulate metabolism.`;
+  }
+
+  // 3. Diabetes or Blood Sugar
+  if (query.includes("diabetes") || query.includes("sugar") || query.includes("insulin") || query.includes("hba1c") || query.includes("glucose")) {
+    return `For diabetes management and blood sugar control:\n\n1. **Prefer**: Missi rotis, Jowar, oats, sprouted methi seeds, leafy greens, bitter gourd, and protein additions (paneer/tofu/eggs) to slow digestion.\n2. **Restrict**: White rice, refined flour (maida), sweets, honey, high GI fruits (sapota, mango, banana).\n3. **Tip**: Suggest the patient drinks warm fenugreek water (1 tsp soaked in water overnight) first thing in the morning.\n\n*Note: If the patient is on active insulin, check blood glucose regularly to avoid nighttime hypoglycemia.*`;
+  }
+
+  // 4. Recipes or cook methods
+  if (query.includes("recipe") || query.includes("how to make") || query.includes("cook")) {
+    if (query.includes("chilla") || query.includes("besan")) {
+      return `**Healthy Besan Chilla Recipe**:\n- Take 1 cup gram flour (besan), add finely chopped onion, tomato, coriander, green chili, and a pinch of turmeric.\n- Whisk with water to create a pouring consistency.\n- Pour onto a non-stick pan, spray drops of olive or cold-pressed mustard oil.\n- Cook both sides until golden. Optional: Stuff with 50g of grated low-fat paneer for a protein boost!`;
+    }
+    if (query.includes("sprouts") || query.includes("salad")) {
+      return `**High-Fiber Sprouts Salad Recipe**:\n- Take 1 cup steam-boiled green gram sprouts.\n- Mix with chopped cucumber, tomato, pomegranate seeds, and fresh coriander.\n- Add a dash of cumin powder, rock salt, and squeeze half a fresh lemon for vitamin C (which helps absorb the iron in legumes).`;
+    }
+    return `I can offer recipes for regional health foods! Let me know if you would like step-by-step methods for millet upma, turmeric milk, or vegetable ragi soup.`;
+  }
+
+  // 5. General greeting & default response
+  if (query.includes("hello") || query.includes("hi") || query.includes("hey") || query.includes("greetings")) {
+    const greetingMsg = settings.assistantGreeting || "Hello, I am Dr. Afreen Fathima's Assistant. Please share the patient's goal, health condition, food preference, and region so I can prepare a draft diet chart.";
+    return `${greetingMsg}${patientPromptInfo ? `\n\nActive context loaded: ${patientPromptInfo}. Feel free to ask about modifying their meal plans!` : ""}`;
+  }
+
+  // Default fallback guidance
+  return `I have recorded your query regarding "**${latestMessage}**". As Dr. Afreen's assistant, I draft plans by:
+- Sourcing local staple grains (like Millets, Ragi, or Oats) based on location.
+- Adjusting protein macros depending on whether they prefer Veg, Non-Veg, or Vegan choices.
+- Excluding items that interact with high BP, hypothyroidism, or kidney guidelines.
+
+Please review this with Dr. Afreen Fathima to authorize the clinical instruction.`;
 }
+
+/* Real implementation logic has been moved to the backend */
 
 export async function nlpAnalyzeReport(text) {
   try {
-    const prompt = `Analyze this clinical health report. Structure the output as valid JSON matching this schema exactly:
-{
-  "keyFindings": ["finding 1", "finding 2"],
-  "concerns": ["concern 1"],
-  "avoid": ["food to avoid 1"],
-  "include": ["food to include 1"],
-  "alerts": ["urgent health alert if any"]
-}
-Text to analyze:
-${text}
-
-Respond ONLY with the raw JSON object, no markdown blocks.`;
-
-    let responseText = await callDirectGroq(prompt, "You are an expert clinical nutrition parser.");
-    
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) responseText = jsonMatch[0];
-    else responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-    
-    const data = JSON.parse(responseText);
-    return {
-      keyFindings: data.keyFindings || [],
-      concerns: data.concerns || [],
-      avoid: data.avoid || [],
-      include: data.include || [],
-      alerts: data.alerts || []
-    };
+    const res = await fetch('/api/ai/analyze-report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text })
+    });
+    const data = await res.json();
+    if (data.error) {
+      console.warn("Backend says:", data.message, "Falling back to local analyzer.");
+      return localNlpAnalyzeReport(text);
+    }
+    return data;
   } catch (err) {
     console.error("Analyze Report API failed, falling back local.", err);
     return localNlpAnalyzeReport(text);
@@ -508,40 +509,17 @@ Respond ONLY with the raw JSON object, no markdown blocks.`;
 
 export async function generateSmartTimelinePlan(patient, dayCount = 1) {
   try {
-    const prompt = `Generate a ${dayCount}-day clinical diet plan for this patient.
-Patient data: ${JSON.stringify(patient)}
-Return ONLY valid JSON matching this schema exactly (no markdown blocks):
-{
-  "hydrationTarget": "3.0 Liters / Day",
-  "foodsToAvoid": "list of CSV strings",
-  "foodsToInclude": "list of CSV strings",
-  "lifestyle": ["tip 1", "tip 2"],
-  "doctorNotes": "clinical note",
-  "days": [
-    {
-      "day": "Day 1",
-      "meals": [
-        { "time": "06:30 AM", "meal": "Wake-up Drink", "foodOptions": "...", "portion": "...", "notes": "..." }
-      ]
+    const res = await fetch('/api/ai/generate-diet-chart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patient, dayCount })
+    });
+    const data = await res.json();
+    if (data.error) {
+       console.warn("Backend says:", data.message, "Falling back to local diet generator.");
+       return localGenerateSmartTimelinePlan(patient, dayCount);
     }
-  ]
-}`;
-
-    let responseText = await callDirectGroq(prompt, "You are an expert clinical dietitian.");
-    
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    if (jsonMatch) responseText = jsonMatch[0];
-    else responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-    
-    const data = JSON.parse(responseText);
-    return {
-      patientId: patient.id,
-      patientName: patient.name,
-      bmi: patient.bmi,
-      bmiCategory: patient.bmiCategory,
-      goal: patient.goal,
-      ...data
-    };
+    return data;
   } catch (err) {
     console.error("Generate Diet API failed, falling back local.", err);
     return localGenerateSmartTimelinePlan(patient, dayCount);
