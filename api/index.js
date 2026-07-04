@@ -10,7 +10,7 @@ app.use(express.json());
 
 function getSettings() {
   return {
-    provider: process.env.VITE_AI_PROVIDER || 'gemini',
+    provider: process.env.VITE_AI_PROVIDER || 'groq',
     apiKey: process.env.AI_API_KEY || process.env.VITE_AI_API_KEY || '',
     model: process.env.VITE_AI_MODEL
   };
