@@ -153,6 +153,7 @@ router.post('/ai/generate-diet-chart', async (req, res) => {
 });
 
 app.use('/api', router);
+app.use('/', router);
 
 // Helper API calls using global fetch
 async function callSinglePrompt(prompt, settings, systemInstruction) {
