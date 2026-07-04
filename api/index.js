@@ -259,4 +259,4 @@ async function callGroqApi(history, patientData, settings, systemOverride) {
     return data.choices[0].message.content;
 }
 
-export default app;
+export default function handler(req, res) { return app(req, res); }
