@@ -31,6 +31,16 @@ router.get('/ai/status', (req, res) => {
   res.json({ isConfigured: !!(apiKey && apiKey.trim().length > 0) });
 });
 
+router.get('/test', (req, res) => {
+  const settings = getSettings();
+  res.json({ 
+    status: 'Vercel API is reached!',
+    provider: settings.provider,
+    hasKey: !!settings.apiKey,
+    envKeysAvailable: Object.keys(process.env).filter(k => k.includes('AI') || k.includes('VITE_AI'))
+  });
+});
+
 router.post('/ai/chat', async (req, res) => {
   const { history, patientData } = req.body;
   const settings = getSettings();
