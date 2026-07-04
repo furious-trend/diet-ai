@@ -152,8 +152,10 @@ router.post('/ai/generate-diet-chart', async (req, res) => {
     }
 });
 
-app.use('/api', router);
-app.use('/', router);
+// Catch-all mapping for Vercel's aggressive path rewriting
+app.use(router);           // matches /ai/chat
+app.use('/api', router);   // matches /api/ai/chat
+app.use('/api/index.js', router); // matches Vercel internal path
 
 // Helper API calls using global fetch
 async function callSinglePrompt(prompt, settings, systemInstruction) {
